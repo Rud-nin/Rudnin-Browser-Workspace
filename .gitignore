@@ -1,0 +1,14 @@
+private/
+test/
+*.exe
+*.out
+dev_experiment*
+dev
+server
+node_modules
+__pycache__
+.venv
+.env
+*.log
+manifest.json
+.codex
