@@ -20,6 +20,8 @@ int handleAPI(HttpRequest *req);
 void *handle_request(void *arg);
 
 int main(int argc, char *argv[]) {
+    // TODO: implement flags
+
     int server_socket = socket(AF_INET, SOCK_STREAM, 0);
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
@@ -83,20 +85,17 @@ void *handle_request(void *arg) {
         req.__fd = client_socket;
         int success = parse_http_request(raw_request, &req);
         free(raw_request);
+
         if (!success) {
             // fail to parse for any reasons
             _500(&req);
-        }
-
-        if (strcmp(req.version, "HTTP/1.1") != 0) {
+        } else if (strcmp(req.version, "HTTP/1.1")) {
             // HTTP 1.1 only server
             _505(&req);
-        }
-
-        if (strncmp(req.resource, "/api", 4) == 0) {
+        } else if (strncmp(req.resource, "/api/", 5) == 0) {
             handleAPI(&req);
         } else {
-            // static resource - public folder
+            // static resources - public folder
             if (strstr(req.resource, "..")) {
                 _403(&req);
                 continue;
@@ -107,9 +106,9 @@ void *handle_request(void *arg) {
             }
 
             send_file(&req);
-            free_http_request(&req);
         }
-
+        
+        free_http_request(&req);
         if (strcmp(get_header("Connection", &req), "close") == 0) {
             break;
         }

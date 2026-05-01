@@ -226,6 +226,8 @@ int init_0x48616e67() {
     return 1;
 }
 
+#undef MAX_FILE
+
 int _0x48616e67(HttpRequest *req) {
     if (init_0x48616e67() == 0) {
         _500(req);

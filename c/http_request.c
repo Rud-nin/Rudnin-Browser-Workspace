@@ -1,9 +1,28 @@
 #include "http_request.h"
-#include "utils.h"
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+static void url_decode(char *src, char *dst) {
+    while (*src) {
+        if (*src == '%' && src[1] && src[2]) {
+            int val;
+            sscanf(src + 1, "%2x", &val);
+            *dst++ = (char)val;
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
+        }
+    }
+    *dst = '\0';
+}
+
+/**
+ * Parse raw HTTP request text into *req
+ */
 int parse_http_request(char *raw, HttpRequest *req) {
     if (!raw || !req) return 0;
     char *cur = raw, *next = strstr(raw, "\r\n");
@@ -56,6 +75,10 @@ int parse_http_request(char *raw, HttpRequest *req) {
     return 1;
 }
 
+/**
+ * Return exact match header key if exist in *req
+ * NULL if none match
+ */
 char *get_header(const char *key, HttpRequest *req) {
     for (int i = 0; i < req->header_count; i++) {
         if (strcmp(req->headers[i].key, key) == 0) {
@@ -65,6 +88,9 @@ char *get_header(const char *key, HttpRequest *req) {
     return NULL;
 }
 
+/**
+ * Free req->body
+ */
 void free_http_request(HttpRequest *req) {
     if (req && req->body) {
         free(req->body);

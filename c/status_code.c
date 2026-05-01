@@ -1,4 +1,5 @@
 #include "status_code.h"
+#include "http_request.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -39,55 +40,44 @@ char *get_message(int status_code, HttpRequest *req) {
     return message;
 }
 
-void _204(HttpRequest *req) {
-    char *res = get_message(204, req);
+void send_message(int status_code, HttpRequest *req) {
+    char *res = get_message(status_code, req);
     write(req->__fd, res, strlen(res));
     free(res);
+}
+
+void _204(HttpRequest *req) {
+    send_message(204, req);
 }
 
 void _400(HttpRequest *req) {
-    char *res = get_message(400, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(400, req);
 }
 
 void _401(HttpRequest *req) {
-    char *res = get_message(401, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(401, req);
 }
 
 void _403(HttpRequest *req) {
-    char *res = get_message(403, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(403, req);
 }
 
 void _404(HttpRequest *req) {
-    char *res = get_message(404, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(404, req);
 }
 
 void _500(HttpRequest *req) {
-    char *res = get_message(500, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(500, req);
 }
 
 void _501(HttpRequest *req) {
-    char *res = get_message(501, req);
-    write(req->__fd, res, strlen(res));
+    send_message(501, req);
 }
 
 void _503(HttpRequest *req) {
-    char *res = get_message(503, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(503, req);
 }
 
 void _505(HttpRequest *req) {
-    char *res = get_message(505, req);
-    write(req->__fd, res, strlen(res));
-    free(res);
+    send_message(505, req);
 }

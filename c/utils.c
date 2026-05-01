@@ -10,6 +10,19 @@
 #include <openssl/ssl.h>
 #include <netdb.h>
 
+/**
+ * get_content_type - Return Content-Type of file name
+ *
+ * The function read possible file extension at any position in file name
+ * string, it's doesn't have to be explicit at the end of the string. This
+ * is thread safe, you mostly to serve send_file()
+ * 
+ * Parameters:
+ *   - file_name: pointer to file name string
+ * 
+ * Return:
+ *   - static string for correspond 
+ */
 const char *get_content_type(const char *file_name) {
     if (strstr(file_name, ".html")) return "text/html";
     if (strstr(file_name, ".css")) return "text/css";
@@ -25,23 +38,22 @@ const char *get_content_type(const char *file_name) {
     return "application/octet-stream"; // fallback
 }
 
-void url_decode(char *src, char *dst) {
-    while (*src) {
-        if (*src == '%' && src[1] && src[2]) {
-            int val;
-            sscanf(src + 1, "%2x", &val);
-            *dst++ = (char)val;
-            src += 3;
-        } else if (*src == '+') {
-            *dst++ = ' ';
-            src++;
-        } else {
-            *dst++ = *src++;
-        }
-    }
-    *dst = '\0';
-}
-
+/**
+ * send_file - Send a static file response for an HTTP request.
+ *
+ * This function builds a file path under "../public" from req->resource. If
+ * the file exists, it sends an HTTP/1.1 200 response with Content-Type and
+ * Content-Length headers, then streams the file body to the request socket.
+ * If the file does not exist, it sends a 404 response.
+ *
+ * Parameters:
+ *   req - Pointer to the parsed HTTP request. req->resource is used as the
+ *         requested file path and req->__fd is used as the output socket.
+ *
+ * Returns:
+ *   1 if the file was found and sent.
+ *   0 if the file was not found and a 404 response was sent.
+ */
 int send_file(HttpRequest *req) {
     char file_path[256] = "../public";
     strcat(file_path, req->resource);
@@ -76,8 +88,7 @@ int send_file(HttpRequest *req) {
 
         fclose(file);
         return 1;
-    }
-    else {
+    } else {
         _404(req);
         return 0;
     }
@@ -298,8 +309,6 @@ char *read_request(int client_socket) {
     char *end_of_headers = NULL;
     char *content_length = NULL;
 
-    // int read_count = 0;
-
     while (!end_of_headers) {
         if (len + 4096 >= cap) {
             cap *= 2;
@@ -313,7 +322,6 @@ char *read_request(int client_socket) {
         }
 
         ssize_t n = read(client_socket, raw_request + len, 4096);
-        // read_count++;
 
         if (n <= 0) {
             // error or client disconnect
@@ -354,7 +362,6 @@ char *read_request(int client_socket) {
             }
 
             int n = read(client_socket, raw_request + len, 4096);
-            // read_count++;
 
             if (n <= 0) {
                 // error or client disconnect
@@ -367,26 +374,6 @@ char *read_request(int client_socket) {
         }
     }
 
-    // printf("Read count: %d\n", read_count);
     raw_request[len] = '\0';
     return raw_request;
-}
-
-double read_num(char *s) {
-    double ans = 0, d = 0.1;
-    int decimal_point = 0;
-    while (1) {
-        if (isdigit(*s)) {
-            if (decimal_point) {
-                ans += d*(*s - '0');
-                d /= 10;
-            }
-            else ans = ans*10 + (*s - '0');
-            s++;
-        } else if (*s == ',') {
-            if (decimal_point) return ans;
-            else decimal_point = 1;
-            s++;
-        } else return ans;
-    }
 }
