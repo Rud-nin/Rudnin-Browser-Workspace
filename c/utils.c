@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <openssl/ssl.h>
 #include <netdb.h>
+#include <sys/select.h>
 
 /**
  * get_content_type - Return Content-Type of file name
@@ -301,13 +302,17 @@ char *fetch(const char *url) {
  *   - Consider adding timeouts or using non-blocking I/O in production.
  */
 char *read_request(int client_socket) {
-    // TODO: implement timeout with select
+    const static int TIMEOUT = 3000; // ms
+
     size_t cap = 8192, len = 0;
     char *raw_request = malloc(cap);
     if (!raw_request) return NULL;
 
     char *end_of_headers = NULL;
     char *content_length = NULL;
+
+    fd_set fds;
+    struct timeval timeout;
 
     while (!end_of_headers) {
         if (len + 4096 >= cap) {
@@ -321,19 +326,36 @@ char *read_request(int client_socket) {
             raw_request = temp;
         }
 
-        ssize_t n = read(client_socket, raw_request + len, 4096);
+        FD_ZERO(&fds);
+        FD_SET(client_socket, &fds);
+        timeout.tv_sec = TIMEOUT / 1000;
+        timeout.tv_usec = TIMEOUT % 1000;
 
-        if (n <= 0) {
-            // error or client disconnect
+        int s = select(client_socket + 1, &fds, NULL, NULL, &timeout);
+
+        if (s == -1) {
+            // error
             free(raw_request);
             return NULL;
+        } else if (s == 0) {
+            // timeout without any message being read
+            raw_request[len] = '\0';
+            return raw_request;
+        } else {
+            ssize_t n = read(client_socket, raw_request + len, 4096);
+
+            if (n <= 0) {
+                // error or client disconnect
+                free(raw_request);
+                return NULL;
+            }
+            len += n;
+            raw_request[len] = '\0';
+
+            // TODO: decline chunk transfer or transfer-encoding
+
+            end_of_headers = strstr(raw_request, "\r\n\r\n");
         }
-        len += n;
-        raw_request[len] = '\0';
-
-        // TODO: decline chunk transfer or transfer-encoding
-
-        end_of_headers = strstr(raw_request, "\r\n\r\n");
     }
 
     // check if body exist
@@ -361,16 +383,33 @@ char *read_request(int client_socket) {
                 raw_request = temp;
             }
 
-            int n = read(client_socket, raw_request + len, 4096);
+            FD_ZERO(&fds);
+            FD_SET(client_socket, &fds);
+            timeout.tv_sec = TIMEOUT / 1000;
+            timeout.tv_usec = TIMEOUT % 1000;
 
-            if (n <= 0) {
-                // error or client disconnect
+            int s = select(client_socket + 1, &fds, NULL, NULL, &timeout);
+
+            if (s == -1) {
+                // error
                 free(raw_request);
                 return NULL;
-            }
+            } else if (s == 0) {
+                // timeout
+                raw_request[len] = '\0';
+                return raw_request;
+            } else  {
+                int n = read(client_socket, raw_request + len, 4096);
 
-            len += n;
-            content_length_read += n;
+                if (n <= 0) {
+                    // error or client disconnect
+                    free(raw_request);
+                    return NULL;
+                }
+
+                len += n;
+                content_length_read += n;
+            }
         }
     }
 

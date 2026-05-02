@@ -78,17 +78,31 @@ void *handle_request(void *arg) {
     free(arg);
 
     while (1) {
-        char *raw_request = read_request(client_socket);
-        if (!raw_request) break;
-        
         HttpRequest req;
         req.__fd = client_socket;
+
+        char *raw_request = read_request(client_socket);
+        if (!raw_request) {
+            _500(&req);
+            continue;
+        }
+        
         int success = parse_http_request(raw_request, &req);
         free(raw_request);
 
         if (!success) {
             // fail to parse for any reasons
-            _500(&req);
+            // 400 with closing connection
+            char message[512];
+            int n = snprintf(
+                message,
+                sizeof(message),
+                "HTTP/1.1 400 %s\r\n"
+                "Content-Length: 0\r\n"
+                "Connection: close\r\n\r\n",
+                get_reason(400)
+            );
+            write(client_socket, message, n);
         } else if (strcmp(req.version, "HTTP/1.1")) {
             // HTTP 1.1 only server
             _505(&req);
@@ -109,7 +123,9 @@ void *handle_request(void *arg) {
         }
         
         free_http_request(&req);
-        if (strcmp(get_header("Connection", &req), "close") == 0) {
+        if (!success) break;
+        char *connection = get_header("Connection", &req);
+        if (connection && strcmp(connection, "close") == 0) {
             break;
         }
     }

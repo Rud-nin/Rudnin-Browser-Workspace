@@ -46,7 +46,7 @@ int parse_http_request(char *raw, HttpRequest *req) {
     url_decode(req->resource, req->resource);
 
     char *body_start = strstr(raw, "\r\n\r\n");
-    if (!body_start) return 0;
+    if (!body_start) return 0; // invalid format
 
     while (next < body_start) {
         cur = next + 2; // skip \r\n
@@ -55,19 +55,26 @@ int parse_http_request(char *raw, HttpRequest *req) {
         request_line[next - cur] = '\0';
 
         char *colon = strchr(request_line, ':');
-        if (!colon) continue;
+        if (!colon) return 0; // invalid format
         *colon = '\0';
 
+        if (colon == request_line) return 0; // empty key, eg: ": Application/json\r\n"
+
+        char *val = colon + 1;
+        while (*val == ' ') val++;
+
+        if (*val == '\0') return 0; // key exist but empty value, eg "Accept:\r\n" or "Accept:    \r\n"
+
         strcpy(req->headers[req->header_count].key, request_line);
-        strcpy(req->headers[req->header_count].value, colon + 2);
+        strcpy(req->headers[req->header_count].value, val);
         req->header_count++;
 
         if (req->header_count >= MAX_HEADER) break;
     }
 
+    body_start += 4;
     if (*body_start == '\0') req->body = NULL;
     else {
-        body_start += 4;
         req->body = malloc(strlen(body_start) + 1);
         strcpy(req->body, body_start);
     }
@@ -82,7 +89,7 @@ int parse_http_request(char *raw, HttpRequest *req) {
 char *get_header(const char *key, HttpRequest *req) {
     for (int i = 0; i < req->header_count; i++) {
         if (strcmp(req->headers[i].key, key) == 0) {
-            return req->headers[i].key;
+            return req->headers[i].value;
         }
     }
     return NULL;
